@@ -27,7 +27,9 @@ impl InputValue {
             (InputValue::Field(field_element), AbiType::Integer { width, .. }) => {
                 field_element.num_bits() <= *width
             }
-
+            (InputValue::Field(field_element), AbiType::Boolean) => {
+                field_element.is_zero() || field_element.is_one()
+            }
             (InputValue::Vec(field_elements), AbiType::Array { length, typ, .. }) => {
                 if field_elements.len() != *length as usize {
                     return false;

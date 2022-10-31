@@ -30,6 +30,7 @@ pub enum AbiType {
     Field,
     Array { length: u128, typ: Box<AbiType> },
     Integer { sign: Sign, width: u32 },
+    Boolean,
     Struct { fields: BTreeMap<String, AbiType> },
 }
 
@@ -60,7 +61,7 @@ pub enum Sign {
 impl AbiType {
     pub fn num_elements(&self) -> usize {
         match self {
-            AbiType::Field | AbiType::Integer { .. } => 1,
+            AbiType::Field | AbiType::Integer { .. } | AbiType::Boolean => 1,
             AbiType::Array { length, typ: _ } => *length as usize,
             AbiType::Struct { fields, .. } => fields.len(),
         }
@@ -69,7 +70,7 @@ impl AbiType {
     /// Returns the number of field elements required to represent the type once encoded.
     pub fn field_count(&self) -> u32 {
         match self {
-            AbiType::Field | AbiType::Integer { .. } => 1,
+            AbiType::Field | AbiType::Integer { .. } | AbiType::Boolean => 1,
             AbiType::Array { length, typ } => typ.field_count() * (*length as u32),
             AbiType::Struct { fields, .. } => {
                 fields.iter().fold(0, |acc, (_, field_type)| acc + field_type.field_count())
@@ -266,6 +267,7 @@ impl Serialize for Abi {
                 AbiType::Field => map.serialize_entry(&param.name, "")?,
                 AbiType::Array { .. } => map.serialize_entry(&param.name, &vec)?,
                 AbiType::Integer { .. } => map.serialize_entry(&param.name, "")?,
+                AbiType::Boolean => map.serialize_entry(&param.name, "")?,
                 AbiType::Struct { .. } => map.serialize_entry(&param.name, "")?,
             };
         }
