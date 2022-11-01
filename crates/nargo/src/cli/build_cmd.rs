@@ -11,8 +11,8 @@ pub(crate) fn run(_args: ArgMatches) -> Result<(), CliError> {
     println!("Constraint system successfully built!");
     Ok(())
 }
-// This is exposed so that we can run the examples and verify that they pass
-pub fn build_from_path<P: AsRef<Path>>(p: P) -> Result<(), CliError> {
+
+fn build_from_path<P: AsRef<Path>>(p: P) -> Result<(), CliError> {
     let mut driver = Resolver::resolve_root_config(p.as_ref())?;
     driver.build();
     // XXX: We can have a --overwrite flag to determine if you want to overwrite the Prover/Verifier.toml files

@@ -1,4 +1,3 @@
-pub use build_cmd::build_from_path;
 use clap::{App, Arg};
 use std::{
     fs::File,
