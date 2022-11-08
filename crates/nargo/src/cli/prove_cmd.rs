@@ -211,25 +211,28 @@ fn export_public_inputs<P: AsRef<Path>>(
     // generate a name->value map for the public inputs, using the ABI and witness_map:
     let mut public_inputs = BTreeMap::new();
     for i in &abi.parameters {
-        if i.1.is_public() {
-            let v = &witness_map[&i.0];
+        if !i.1.is_public() {
+            // Skip any private inputs
+            continue;
+        };
 
-            let iv = if matches!(*v, InputValue::Undefined) {
-                let w_ret = w_ret.unwrap();
-                match &i.1 {
-                    AbiType::Array { length, .. } => {
-                        let return_values = noirc_frontend::util::vecmap(0..*length, |i| {
-                            *solved_witness.get(&Witness::new(w_ret.0 + i as u32)).unwrap()
-                        });
-                        InputValue::Vec(return_values)
-                    }
-                    _ => InputValue::Field(*solved_witness.get(&w_ret).unwrap()),
+        let v = &witness_map[&i.0];
+
+        let iv = if matches!(*v, InputValue::Undefined) {
+            let w_ret = w_ret.unwrap();
+            match &i.1 {
+                AbiType::Array { length, .. } => {
+                    let return_values = noirc_frontend::util::vecmap(0..*length, |i| {
+                        *solved_witness.get(&Witness::new(w_ret.0 + i as u32)).unwrap()
+                    });
+                    InputValue::Vec(return_values)
                 }
-            } else {
-                v.clone()
-            };
-            public_inputs.insert(i.0.clone(), iv);
-        }
+                _ => InputValue::Field(*solved_witness.get(&w_ret).unwrap()),
+            }
+        } else {
+            v.clone()
+        };
+        public_inputs.insert(i.0.clone(), iv);
     }
     //serialise public inputs into verifier.toml
     noirc_abi::input_parser::Format::Toml.serialise(&path, VERIFIER_INPUT_FILE, &public_inputs)
