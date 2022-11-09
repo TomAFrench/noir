@@ -194,20 +194,23 @@ pub fn solve_witness<P: AsRef<Path>>(
         _ => unreachable!(),
     }
 
-    // (over)writes verifier.toml
-    export_public_inputs(rv, &solved_witness, &witness_map, abi, &program_dir)
-        .map_err(CliError::from)?;
+    // Serialise public inputs into Verifier.toml
+    let public_inputs = export_public_inputs(rv, &solved_witness, &witness_map, abi);
+    noirc_abi::input_parser::Format::Toml.serialise(
+        &program_dir,
+        VERIFIER_INPUT_FILE,
+        &public_inputs,
+    )?;
 
     Ok(solved_witness)
 }
 
-fn export_public_inputs<P: AsRef<Path>>(
+fn export_public_inputs(
     w_ret: Option<Witness>,
     solved_witness: &BTreeMap<Witness, FieldElement>,
     witness_map: &BTreeMap<String, InputValue>,
     abi: &Abi,
-    path: P,
-) -> Result<(), noirc_abi::errors::InputParserError> {
+) -> BTreeMap<String, InputValue> {
     // generate a name->value map for the public inputs, using the ABI and witness_map:
     let mut public_inputs = BTreeMap::new();
     for (param_name, param_type) in &abi.parameters {
@@ -234,8 +237,8 @@ fn export_public_inputs<P: AsRef<Path>>(
         };
         public_inputs.insert(param_name.clone(), iv);
     }
-    //serialise public inputs into verifier.toml
-    noirc_abi::input_parser::Format::Toml.serialise(&path, VERIFIER_INPUT_FILE, &public_inputs)
+
+    public_inputs
 }
 
 pub fn prove_with_path<P: AsRef<Path>>(
