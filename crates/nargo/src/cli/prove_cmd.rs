@@ -142,6 +142,30 @@ fn input_value_into_witness(
     Ok((index, return_witness))
 }
 
+fn read_value_from_witness(
+    initial_index: u32,
+    solved_witness: &BTreeMap<Witness, FieldElement>,
+    value_type: &AbiType,
+) -> InputValue {
+    match value_type {
+        AbiType::Array { length, .. } => {
+            let return_values = noirc_frontend::util::vecmap(0..*length, |i| {
+                *solved_witness.get(&Witness::new(initial_index + i as u32)).unwrap()
+            });
+
+            InputValue::Vec(return_values)
+        }
+        AbiType::Field(_) | AbiType::Integer { .. } => {
+            let field_element = *solved_witness.get(&Witness::new(initial_index)).unwrap();
+
+            InputValue::Field(field_element)
+        }
+        AbiType::Struct { .. } => {
+            todo!("Struct equality checks not implemented yet so they cannot be returned from main")
+        }
+    }
+}
+
 pub fn compile_circuit_and_witness<P: AsRef<Path>>(
     program_dir: P,
     show_ssa: bool,
@@ -206,12 +230,12 @@ pub fn solve_witness<P: AsRef<Path>>(
 }
 
 fn export_public_inputs(
-    w_ret: Option<Witness>,
+    return_value_witness: Option<Witness>,
     solved_witness: &BTreeMap<Witness, FieldElement>,
     witness_map: &BTreeMap<String, InputValue>,
     abi: &Abi,
 ) -> BTreeMap<String, InputValue> {
-    // generate a name->value map for the public inputs, using the ABI and witness_map:
+    // Generate a name->value map for the public inputs, using the ABI and witness_map:
     let mut public_inputs = BTreeMap::new();
     for (param_name, param_type) in &abi.parameters {
         if !param_type.is_public() {
@@ -222,16 +246,9 @@ fn export_public_inputs(
         let v = &witness_map[param_name];
 
         let iv = if matches!(*v, InputValue::Undefined) {
-            let w_ret = w_ret.unwrap();
-            match param_type {
-                AbiType::Array { length, .. } => {
-                    let return_values = noirc_frontend::util::vecmap(0..*length, |i| {
-                        *solved_witness.get(&Witness::new(w_ret.0 + i as u32)).unwrap()
-                    });
-                    InputValue::Vec(return_values)
-                }
-                _ => InputValue::Field(*solved_witness.get(&w_ret).unwrap()),
-            }
+            // Most public inputs can just be read off from `witness_map`. The return value however is calculated inside
+            // the circuit so we need to pull out the relevant witnesses from `solved_witness`.
+            read_value_from_witness(return_value_witness.unwrap().0, solved_witness, param_type)
         } else {
             v.clone()
         };
