@@ -243,16 +243,15 @@ fn export_public_inputs(
             continue;
         };
 
-        let v = &witness_map[param_name];
-
-        let iv = if matches!(*v, InputValue::Undefined) {
-            // Most public inputs can just be read off from `witness_map`. The return value however is calculated inside
-            // the circuit so we need to pull out the relevant witnesses from `solved_witness`.
-            read_value_from_witness(return_value_witness.unwrap().0, solved_witness, param_type)
-        } else {
-            v.clone()
+        // Most public inputs can just be read off from `witness_map`. The return value however is calculated inside
+        // the circuit so we need to pull out the relevant witnesses from `solved_witness`.
+        let param_value = match &witness_map[param_name] {
+            InputValue::Undefined => {
+                read_value_from_witness(return_value_witness.unwrap().0, solved_witness, param_type)
+            }
+            other => other.to_owned(),
         };
-        public_inputs.insert(param_name.clone(), iv);
+        public_inputs.insert(param_name.clone(), param_value);
     }
 
     public_inputs
