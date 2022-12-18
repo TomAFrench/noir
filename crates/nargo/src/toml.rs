@@ -1,16 +1,20 @@
-use serde_derive::Deserialize;
+use serde_derive::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::Path;
 
 use crate::errors::CliError;
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct Config {
     pub package: Package,
     pub dependencies: BTreeMap<String, Dependency>,
 }
 
 impl Config {
+    pub fn new() -> Self {
+        Self { package: Package::new(), dependencies: BTreeMap::new() }
+    }
+
     // Local paths are usually relative and are discouraged when sharing libraries
     // It is better to separate these into different packages.
     pub fn has_local_path(&self) -> bool {
@@ -25,7 +29,7 @@ impl Config {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct Package {
     // Note: a package name is not needed unless there is a registry
     pub authors: Vec<String>,
@@ -39,7 +43,18 @@ pub struct Package {
     pub license: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+impl Package {
+    pub fn new() -> Self {
+        Self {
+            authors: Vec::new(),
+            compiler_version: Some("0.1".to_string()),
+            backend: None,
+            license: None,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Clone, Serialize)]
 #[serde(untagged)]
 /// Enum representing the different types of ways to
 /// supply a source for the dependency
@@ -93,5 +108,6 @@ fn parse_standard_toml() {
         hello = {path = "./noir_driver"}
     "#;
 
-    assert!(parse_toml_str(src).is_ok());
+    let parsed_config: Result<Config, _> = toml::from_str(src);
+    assert!(parsed_config.is_ok());
 }

@@ -1,11 +1,12 @@
-use crate::{
-    constants::{PKG_FILE, SRC_DIR},
-    errors::CliError,
-};
-
-use super::{create_named_dir, write_to_file};
 use clap::ArgMatches;
 use std::path::Path;
+
+use crate::{
+    cli::{create_named_dir, write_to_file},
+    constants::{PKG_FILE, SRC_DIR},
+    errors::CliError,
+    toml::Config,
+};
 
 pub(crate) fn run(args: ArgMatches) -> Result<(), CliError> {
     let cmd = args.subcommand_matches("new").unwrap();
@@ -27,15 +28,8 @@ pub(crate) fn run(args: ArgMatches) -> Result<(), CliError> {
     const EXAMPLE: &str =
         concat!("fn main(x : Field, y : pub Field) {\n", "    constrain x != y;\n", "}");
 
-    const SETTINGS: &str = concat!(
-        "[package]\n",
-        "authors = [\"\"]\n",
-        "compiler_version = \"0.1\"\n",
-        "\n",
-        "[dependencies]"
-    );
-
-    write_to_file(SETTINGS.as_bytes(), &package_dir.join(Path::new(PKG_FILE)));
+    let settings = toml::to_string(&Config::new()).unwrap();
+    write_to_file(settings.as_bytes(), &package_dir.join(Path::new(PKG_FILE)));
     write_to_file(EXAMPLE.as_bytes(), &src_dir.join(Path::new("main.nr")));
     println!("Project successfully created! Binary located at {}", package_dir.display());
     Ok(())
