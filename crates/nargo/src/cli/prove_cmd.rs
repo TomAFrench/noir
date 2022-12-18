@@ -63,21 +63,23 @@ pub fn parse_and_solve_witness<P: AsRef<Path>>(
     // Solve the remaining witnesses
     let solved_witness = solve_witness(compiled_program, &witness_map)?;
 
-    // We allow the user to optionally not provide a value for the circuit's return value, so this may be missing from
-    // `witness_map`. We must then decode these from the circuit's witness values.
-    let encoded_public_inputs: Vec<FieldElement> = compiled_program
-        .circuit
-        .public_inputs
-        .0
-        .iter()
-        .map(|index| solved_witness[index])
-        .collect();
-
+    // Write public inputs (if any) into Verifier.toml.
     let public_abi = compiled_program.abi.as_ref().unwrap().clone().public_abi();
-    let public_inputs = public_abi.decode(&encoded_public_inputs)?;
+    if public_abi.num_parameters() > 0 {
+        // We allow the user to optionally not provide a value for the circuit's return value, so this may be missing from
+        // `witness_map`. We must then decode these from the circuit's witness values.
+        let encoded_public_inputs: Vec<FieldElement> = compiled_program
+            .circuit
+            .public_inputs
+            .0
+            .iter()
+            .map(|index| solved_witness[index])
+            .collect();
 
-    // Write public inputs into Verifier.toml
-    write_inputs_to_file(&public_inputs, &program_dir, VERIFIER_INPUT_FILE, Format::Toml)?;
+        let public_inputs = public_abi.decode(&encoded_public_inputs)?;
+
+        write_inputs_to_file(&public_inputs, &program_dir, VERIFIER_INPUT_FILE, Format::Toml)?;
+    }
 
     Ok(solved_witness)
 }
