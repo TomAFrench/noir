@@ -4,13 +4,11 @@ use std::{
 };
 
 use acvm::Language;
+use nargo_project::{Config, Dependency};
 use noirc_driver::Driver;
 use noirc_frontend::graph::{CrateId, CrateType};
 
-use crate::{
-    errors::CliError,
-    toml::{Config, Dependency},
-};
+use crate::errors::CliError;
 
 /// Creates a unique folder name for a GitHub repo
 /// by using it's URL and tag

@@ -1697,6 +1697,7 @@ dependencies = [
  "hex",
  "iter-extended",
  "marlin_arkworks_backend",
+ "nargo_project",
  "noirc_abi",
  "noirc_driver",
  "noirc_frontend",
@@ -1708,6 +1709,15 @@ dependencies = [
  "thiserror",
  "toml",
  "url",
+]
+
+[[package]]
+name = "nargo_project"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_derive",
+ "toml",
 ]
 
 [[package]]

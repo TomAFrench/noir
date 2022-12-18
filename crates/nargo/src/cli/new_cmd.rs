@@ -1,11 +1,12 @@
 use clap::ArgMatches;
 use std::path::Path;
 
+use nargo_project::Config;
+
 use crate::{
     cli::{create_named_dir, write_to_file},
     constants::{PKG_FILE, SRC_DIR},
     errors::CliError,
-    toml::Config,
 };
 
 pub(crate) fn run(args: ArgMatches) -> Result<(), CliError> {
