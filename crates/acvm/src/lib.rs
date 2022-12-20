@@ -15,6 +15,7 @@ use acir::{
     OPCODE,
 };
 use pwg::binary::BinarySolver;
+use thiserror::Error;
 
 use crate::pwg::{arithmetic::ArithmeticSolver, logic::LogicSolver};
 use num_bigint::BigUint;
@@ -26,12 +27,18 @@ pub use acir::FieldElement;
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum GateResolution {
-    Resolved,                  //Gate is solved
-    Skip,                      //Gate cannot be solved
-    UnknownError(String),      //Generic error
-    UnsupportedOpcode(OPCODE), //Unsupported Opcode
-    UnsatisfiedConstrain,      //Gate is not satisfied
-    Solved,                    //Circuit is solved, after a number of passes
+    Resolved, //Gate is solved
+    Skip,     //Gate cannot be solved
+}
+
+#[derive(PartialEq, Eq, Error, Debug)]
+pub enum GateResolutionError {
+    #[error("{0}")]
+    UnknownError(String),
+    #[error("backend does not currently support the {0} opcode. ACVM does not currently fall back to arithmetic gates.")]
+    UnsupportedOpcode(OPCODE),
+    #[error("could not satisfy all constraints.")]
+    UnsatisfiedConstrain,
 }
 
 pub trait Backend: SmartContract + ProofSystemCompiler + PartialWitnessGenerator {}
@@ -44,13 +51,13 @@ pub trait PartialWitnessGenerator {
         &self,
         initial_witness: &mut BTreeMap<Witness, FieldElement>,
         gate: &Gate,
-    ) -> GateResolution {
-        match gate {
-            Gate::Arithmetic(arith) => ArithmeticSolver::solve(initial_witness, arith),
+    ) -> Result<GateResolution, GateResolutionError> {
+        let resolution: GateResolution = match gate {
+            Gate::Arithmetic(arith) => ArithmeticSolver::solve(initial_witness, arith)?,
             Gate::Range(w, r) => {
                 if let Some(w_value) = initial_witness.get(w) {
                     if w_value.num_bits() > *r {
-                        return GateResolution::UnsatisfiedConstrain;
+                        return Err(GateResolutionError::UnsatisfiedConstrain);
                     }
                     GateResolution::Resolved
                 } else {
@@ -76,7 +83,7 @@ pub trait PartialWitnessGenerator {
                 if unsolvable {
                     GateResolution::Skip
                 } else if let Err(op) = Self::solve_gadget_call(initial_witness, gc) {
-                    GateResolution::UnsupportedOpcode(op)
+                    return Err(GateResolutionError::UnsupportedOpcode(op));
                 } else {
                     GateResolution::Resolved
                 }
@@ -152,7 +159,7 @@ pub trait PartialWitnessGenerator {
                                 }
                                 std::collections::btree_map::Entry::Occupied(e) => {
                                     if e.get() != &v {
-                                        return GateResolution::UnsatisfiedConstrain;
+                                        return Err(GateResolutionError::UnsatisfiedConstrain);
                                     }
                                 }
                             }
@@ -166,7 +173,7 @@ pub trait PartialWitnessGenerator {
                         let int_a = BigUint::from_bytes_be(&val_a.to_bytes());
                         let pow: BigUint = BigUint::one() << (bit_size - 1);
                         if int_a >= (&pow << 1) {
-                            return GateResolution::UnsatisfiedConstrain;
+                            return Err(GateResolutionError::UnsatisfiedConstrain);
                         }
                         let bb = &int_a & &pow;
                         let int_r = &int_a - &bb;
@@ -181,14 +188,16 @@ pub trait PartialWitnessGenerator {
                     _ => GateResolution::Skip,
                 },
             },
-        }
+        };
+
+        Ok(resolution)
     }
 
     fn solve(
         &self,
         initial_witness: &mut BTreeMap<Witness, FieldElement>,
         mut gates_to_resolve: Vec<Gate>,
-    ) -> GateResolution {
+    ) -> Result<(), GateResolutionError> {
         let mut unresolved_gates: Vec<Gate> = Vec::new();
         let mut ctx = BinarySolver::new();
         //binary_solve is used to manage the binary solving mode:
@@ -207,14 +216,13 @@ pub trait PartialWitnessGenerator {
                 Box::new(gates_to_resolve.iter())
             };
             for gate in gates {
-                let mut result = self.solve_gate(initial_witness, gate);
+                let mut result = self.solve_gate(initial_witness, gate)?;
                 if binary_solve.is_some() && result == GateResolution::Skip {
-                    result = ctx.solve(gate, initial_witness);
+                    result = ctx.solve(gate, initial_witness)?;
                 }
                 match result {
                     GateResolution::Skip => unresolved_gates.push(gate.clone()),
                     GateResolution::Resolved => (),
-                    resolution => return resolution,
                 }
             }
 
@@ -227,7 +235,7 @@ pub trait PartialWitnessGenerator {
             }
             std::mem::swap(&mut gates_to_resolve, &mut unresolved_gates);
         }
-        GateResolution::Solved
+        Ok(())
     }
 
     fn solve_gadget_call(

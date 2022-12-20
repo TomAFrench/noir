@@ -8,7 +8,7 @@ use acir::{
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
 
-use crate::GateResolution;
+use crate::{GateResolution, GateResolutionError};
 
 // This structure tracks un-resolved witnesses which are constrained to be booleans or sum of booleans, so that gates which uses only those can be solved.
 // This is the case for array equality constraints which are unsolved when the value of arrays returned from main are not supplied in the .toml
@@ -57,8 +57,8 @@ impl BinarySolver {
         &mut self,
         gate: &Gate,
         initial_witness: &mut BTreeMap<Witness, FieldElement>,
-    ) -> GateResolution {
-        let mut result = GateResolution::Skip;
+    ) -> Result<GateResolution, GateResolutionError> {
+        let mut result = Ok(GateResolution::Skip);
         if let Gate::Arithmetic(arith) = gate {
             let partial_gate =
                 super::arithmetic::ArithmeticSolver::evaluate(arith, initial_witness);
@@ -75,14 +75,9 @@ impl BinarySolver {
         &self,
         initial_witness: &mut BTreeMap<Witness, FieldElement>,
         gate: &Expression,
-    ) -> GateResolution {
-        let result = self.solve_inverse(gate, initial_witness);
-        match result {
-            GateResolution::Resolved
-            | GateResolution::UnsatisfiedConstrain
-            | GateResolution::UnknownError(_) => return result,
-            GateResolution::Skip => (),
-            GateResolution::UnsupportedOpcode(_) | GateResolution::Solved => unreachable!(),
+    ) -> Result<GateResolution, GateResolutionError> {
+        if let GateResolution::Resolved = self.solve_inverse(gate, initial_witness)? {
+            return Ok(GateResolution::Resolved);
         }
 
         if let Some(max) = self.is_binary(gate) {
@@ -91,15 +86,15 @@ impl BinarySolver {
                     for (_, w) in &gate.linear_combinations {
                         initial_witness.insert(*w, FieldElement::zero());
                     }
-                    GateResolution::Resolved
+                    Ok(GateResolution::Resolved)
                 } else {
-                    GateResolution::UnsatisfiedConstrain
+                    Err(GateResolutionError::UnsatisfiedConstrain)
                 }
             } else {
-                GateResolution::Skip
+                Ok(GateResolution::Skip)
             }
         } else {
-            GateResolution::Skip
+            Ok(GateResolution::Skip)
         }
     }
 
@@ -129,7 +124,7 @@ impl BinarySolver {
         &self,
         gate: &Expression,
         initial_witness: &mut BTreeMap<Witness, FieldElement>,
-    ) -> GateResolution {
+    ) -> Result<GateResolution, GateResolutionError> {
         if gate.mul_terms.len() == 1
             && self.are_inverse(&gate.mul_terms[0].1, &gate.mul_terms[0].2)
             && gate.linear_combinations.is_empty()
@@ -137,13 +132,13 @@ impl BinarySolver {
             if gate.q_c.is_zero() {
                 initial_witness.insert(gate.mul_terms[0].1, FieldElement::zero());
                 initial_witness.insert(gate.mul_terms[0].2, FieldElement::zero());
-                return GateResolution::Resolved;
+                return Ok(GateResolution::Resolved);
             } else if !gate.q_c.is_one() {
-                return GateResolution::UnsatisfiedConstrain;
+                return Err(GateResolutionError::UnsatisfiedConstrain);
             }
         }
 
-        GateResolution::Skip
+        Ok(GateResolution::Skip)
     }
 
     // look for boolean constraint and add boolean witness to a map
