@@ -1,3 +1,4 @@
+use acvm::GateResolutionError;
 use hex::FromHexError;
 use noirc_abi::errors::{AbiError, InputParserError};
 use std::{fmt::Display, io::Write, path::PathBuf};
@@ -43,6 +44,12 @@ impl Display for CliError {
 
 impl From<InputParserError> for CliError {
     fn from(error: InputParserError) -> Self {
+        CliError::Generic(error.to_string())
+    }
+}
+
+impl From<GateResolutionError> for CliError {
+    fn from(error: GateResolutionError) -> Self {
         CliError::Generic(error.to_string())
     }
 }

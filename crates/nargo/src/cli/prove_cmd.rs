@@ -104,9 +104,7 @@ fn solve_witness(
         .collect();
 
     let backend = crate::backends::ConcreteBackend;
-    backend
-        .solve(&mut solved_witness, compiled_program.circuit.gates.clone())
-        .map_err(|err| CliError::Generic(err.to_string()))?;
+    backend.solve(&mut solved_witness, compiled_program.circuit.gates.clone())?;
 
     Ok(solved_witness)
 }
