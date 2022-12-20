@@ -58,16 +58,16 @@ impl BinarySolver {
         gate: &Gate,
         initial_witness: &mut BTreeMap<Witness, FieldElement>,
     ) -> Result<GateResolution, GateResolutionError> {
-        let mut result = Ok(GateResolution::Skip);
         if let Gate::Arithmetic(arith) = gate {
             let partial_gate =
                 super::arithmetic::ArithmeticSolver::evaluate(arith, initial_witness);
-            result = self.solve_booleans(initial_witness, &partial_gate);
+            let result = self.solve_booleans(initial_witness, &partial_gate);
             self.identify_booleans(&partial_gate);
+            result
         } else {
             self.identify_binaries(gate);
+            Ok(GateResolution::Skip)
         }
-        result
     }
 
     /// Solve (some) arithemtic expression which is only using booleans
