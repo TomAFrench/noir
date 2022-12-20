@@ -195,9 +195,9 @@ pub trait PartialWitnessGenerator {
 
     fn solve(
         &self,
-        initial_witness: &mut BTreeMap<Witness, FieldElement>,
+        mut initial_witness: BTreeMap<Witness, FieldElement>,
         mut gates_to_resolve: Vec<Gate>,
-    ) -> Result<(), GateResolutionError> {
+    ) -> Result<BTreeMap<Witness, FieldElement>, GateResolutionError> {
         let mut unresolved_gates: Vec<Gate> = Vec::new();
         let mut ctx = BinarySolver::new();
         //binary_solve is used to manage the binary solving mode:
@@ -216,9 +216,9 @@ pub trait PartialWitnessGenerator {
                 Box::new(gates_to_resolve.iter())
             };
             for gate in gates {
-                let mut result = self.solve_gate(initial_witness, gate)?;
+                let mut result = self.solve_gate(&mut initial_witness, gate)?;
                 if binary_solve.is_some() && result == GateResolution::Skip {
-                    result = ctx.solve(gate, initial_witness)?;
+                    result = ctx.solve(gate, &mut initial_witness)?;
                 }
                 match result {
                     GateResolution::Skip => unresolved_gates.push(gate.clone()),
@@ -235,7 +235,7 @@ pub trait PartialWitnessGenerator {
             }
             std::mem::swap(&mut gates_to_resolve, &mut unresolved_gates);
         }
-        Ok(())
+        Ok(initial_witness)
     }
 
     fn solve_gadget_call(

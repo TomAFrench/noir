@@ -94,7 +94,7 @@ fn solve_witness(
         _ => CliError::from(error),
     })?;
 
-    let mut solved_witness: BTreeMap<Witness, FieldElement> = encoded_inputs
+    let initial_witness: BTreeMap<Witness, FieldElement> = encoded_inputs
         .into_iter()
         .enumerate()
         .map(|(index, witness_value)| {
@@ -104,7 +104,7 @@ fn solve_witness(
         .collect();
 
     let backend = crate::backends::ConcreteBackend;
-    backend.solve(&mut solved_witness, compiled_program.circuit.gates.clone())?;
+    let solved_witness = backend.solve(initial_witness, compiled_program.circuit.gates.clone())?;
 
     Ok(solved_witness)
 }
