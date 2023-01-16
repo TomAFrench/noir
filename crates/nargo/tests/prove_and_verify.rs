@@ -45,7 +45,7 @@ mod tests {
                 println!("Running test {test_name:?}");
                 if c.path().is_dir() && !conf_data["exclude"].contains(&test_name) {
                     let verified = std::panic::catch_unwind(|| {
-                        nargo::cli::prove_and_verify("pp", &c.path(), false)
+                        nargo::cli::prove_and_verify(&c.path(), false).map_or(false, |r| r)
                     });
 
                     let r = match verified {

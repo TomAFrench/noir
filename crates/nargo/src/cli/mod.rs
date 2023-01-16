@@ -1,3 +1,4 @@
+use acvm::ProofSystemCompiler;
 pub use check_cmd::check_from_path;
 use clap::{App, AppSettings, Arg};
 use noirc_abi::{
@@ -12,8 +13,6 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
 };
-extern crate tempdir;
-use tempdir::TempDir;
 
 use crate::errors::CliError;
 
@@ -180,23 +179,16 @@ fn write_inputs_to_file<P: AsRef<Path>>(
 }
 
 // helper function which tests noir programs by trying to generate a proof and verify it
-pub fn prove_and_verify(proof_name: &str, prg_dir: &Path, show_ssa: bool) -> bool {
-    let tmp_dir = TempDir::new("p_and_v_tests").unwrap();
-    let proof_path = match prove_cmd::prove_with_path(
-        proof_name,
-        prg_dir,
-        &tmp_dir.into_path(),
-        show_ssa,
-        false,
-    ) {
-        Ok(p) => p,
-        Err(error) => {
-            println!("{error}");
-            return false;
-        }
-    };
+pub fn prove_and_verify(prg_dir: &Path, show_ssa: bool) -> Result<bool, CliError> {
+    let compiled_program = compile_cmd::compile_circuit(prg_dir, show_ssa, false)?;
 
-    verify_cmd::verify_with_path(prg_dir, &proof_path, show_ssa, false).unwrap()
+    let (_, solved_witness) = execute_cmd::execute_program(prg_dir, &compiled_program)?;
+    let public_inputs = execute_cmd::extract_public_inputs(&compiled_program, &solved_witness)?;
+
+    let backend = crate::backends::ConcreteBackend;
+    let proof = backend.prove_with_meta(compiled_program.circuit.clone(), solved_witness);
+
+    verify_cmd::verify_proof(compiled_program, public_inputs, proof)
 }
 
 fn add_std_lib(driver: &mut Driver) {

@@ -33,11 +33,18 @@ fn execute(
     allow_warnings: bool,
 ) -> Result<(Option<InputValue>, BTreeMap<Witness, FieldElement>), CliError> {
     let curr_dir = std::env::current_dir().unwrap();
+    execute_with_path(curr_dir, show_ssa, allow_warnings)
+}
 
+pub(crate) fn execute_with_path<P: AsRef<Path>>(
+    program_dir: P,
+    show_ssa: bool,
+    allow_warnings: bool,
+) -> Result<(Option<InputValue>, BTreeMap<Witness, FieldElement>), CliError> {
     let compiled_program =
-        super::compile_cmd::compile_circuit(&curr_dir, show_ssa, allow_warnings)?;
+        super::compile_cmd::compile_circuit(&program_dir, show_ssa, allow_warnings)?;
 
-    execute_program(curr_dir, &compiled_program)
+    execute_program(program_dir, &compiled_program)
 }
 
 pub(crate) fn execute_program<P: AsRef<Path>>(
