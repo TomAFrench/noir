@@ -261,6 +261,7 @@ impl Evaluator {
         let main = igen.program.main();
         let main_params = std::mem::take(&mut main.parameters);
         let abi_params = std::mem::take(&mut igen.program.abi.parameters);
+        println!("{main_params:?}");
         assert_eq!(main_params.len(), abi_params.len());
 
         for ((param_id, _, param_name, _), abi_param) in main_params.iter().zip(abi_params) {

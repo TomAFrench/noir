@@ -119,6 +119,7 @@ impl AbiParameter {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Abi {
     pub parameters: Vec<AbiParameter>,
+    pub return_type: Option<AbiType>,
 }
 
 impl Abi {
@@ -148,13 +149,14 @@ impl Abi {
     pub fn public_abi(self) -> Abi {
         let parameters: Vec<_> =
             self.parameters.into_iter().filter(|param| param.is_public()).collect();
-        Abi { parameters }
+        Abi { parameters, return_type: self.return_type }
     }
 
     /// Encode a set of inputs as described in the ABI into a vector of `FieldElement`s.
     pub fn encode(
         self,
         inputs: &BTreeMap<String, InputValue>,
+        return_value: Option<InputValue>,
         allow_undefined_return: bool,
     ) -> Result<Vec<FieldElement>, AbiError> {
         let param_names = self.parameter_names();
@@ -170,27 +172,38 @@ impl Abi {
                 return Err(AbiError::TypeMismatch { param: param.to_owned(), value });
             }
 
-            // As the circuit calculates the return value in the process of calculating rest of the witnesses
-            // it's not absolutely necessary to provide them as inputs. We then tolerate an undefined value for
-            // the return value input and just skip it.
-            if allow_undefined_return
-                && param.name == MAIN_RETURN_NAME
-                && matches!(value, InputValue::Undefined)
-            {
-                let return_witness_len = param.typ.field_count();
-
-                // We do not support undefined arrays for now - TODO
-                if return_witness_len != 1 {
-                    return Err(AbiError::Generic(
-                        "Values of array returned from main must be specified".to_string(),
-                    ));
-                } else {
-                    // This assumes that the return value is at the end of the ABI, otherwise values will be misaligned.
-                    continue;
-                }
-            }
-
             encoded_inputs.extend(Self::encode_value(value, &param.name)?);
+        }
+
+        // As the circuit calculates the return value in the process of calculating rest of the witnesses
+        // it's not absolutely necessary to provide them as inputs. We then tolerate an undefined value for
+        // the return value input and just skip it.
+        if let Some(expected_return_type) = &self.return_type {
+            match return_value.clone() {
+                Some(InputValue::Undefined) if allow_undefined_return => {
+                    let return_witness_len = expected_return_type.field_count();
+
+                    // We do not support undefined arrays for now - TODO
+                    if return_witness_len != 1 {
+                        return Err(AbiError::Generic(
+                            "Values of array returned from main must be specified".to_string(),
+                        ));
+                    }
+                }
+                Some(value) => {
+                    if !value.matches_abi(&expected_return_type) {
+                        panic!("Unexpected return value")
+                    }
+                    encoded_inputs.extend(Self::encode_value(value, &MAIN_RETURN_NAME.to_owned())?);
+                }
+                // We require the user to pass an explicitly undefined return value
+                None => panic!("missing return value"),
+            }
+        }
+        {
+            if return_value.is_some() {
+                panic!("Unexpected return value")
+            }
         }
 
         // Check that no extra witness values have been provided.

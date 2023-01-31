@@ -5,8 +5,8 @@ use crate::{
 };
 use acvm::ProofSystemCompiler;
 use clap::ArgMatches;
-use noirc_abi::errors::AbiError;
 use noirc_abi::input_parser::{Format, InputValue};
+use noirc_abi::{errors::AbiError, MAIN_RETURN_NAME};
 use noirc_driver::CompiledProgram;
 use std::{collections::BTreeMap, path::Path, path::PathBuf};
 
@@ -43,6 +43,7 @@ pub fn verify_with_path<P: AsRef<Path>>(
 ) -> Result<bool, CliError> {
     let compiled_program = compile_circuit(program_dir.as_ref(), show_ssa, allow_warnings)?;
     let mut public_inputs = BTreeMap::new();
+    let mut return_value = None;
 
     // Load public inputs (if any) from `VERIFIER_INPUT_FILE`.
     let public_abi = compiled_program.abi.clone().unwrap().public_abi();
@@ -51,9 +52,11 @@ pub fn verify_with_path<P: AsRef<Path>>(
         let curr_dir = program_dir;
         public_inputs =
             read_inputs_from_file(curr_dir, VERIFIER_INPUT_FILE, Format::Toml, public_abi)?;
+        return_value = public_inputs.remove(MAIN_RETURN_NAME);
     }
 
-    let valid_proof = verify_proof(compiled_program, public_inputs, load_proof(proof_path)?)?;
+    let valid_proof =
+        verify_proof(compiled_program, public_inputs, return_value, load_proof(proof_path)?)?;
 
     Ok(valid_proof)
 }
@@ -61,15 +64,17 @@ pub fn verify_with_path<P: AsRef<Path>>(
 fn verify_proof(
     compiled_program: CompiledProgram,
     public_inputs: BTreeMap<String, InputValue>,
+    return_value: Option<InputValue>,
     proof: Vec<u8>,
 ) -> Result<bool, CliError> {
     let public_abi = compiled_program.abi.unwrap().public_abi();
-    let public_inputs = public_abi.encode(&public_inputs, false).map_err(|error| match error {
-        AbiError::UndefinedInput(_) => {
-            CliError::Generic(format!("{error} in the {VERIFIER_INPUT_FILE}.toml file."))
-        }
-        _ => CliError::from(error),
-    })?;
+    let public_inputs =
+        public_abi.encode(&public_inputs, return_value, false).map_err(|error| match error {
+            AbiError::UndefinedInput(_) => {
+                CliError::Generic(format!("{error} in the {VERIFIER_INPUT_FILE}.toml file."))
+            }
+            _ => CliError::from(error),
+        })?;
 
     let backend = crate::backends::ConcreteBackend;
     let valid_proof = backend.verify_from_cs(&proof, public_inputs, compiled_program.circuit);

@@ -7,6 +7,7 @@ use acvm::ProofSystemCompiler;
 use clap::ArgMatches;
 use noirc_abi::errors::AbiError;
 use noirc_abi::input_parser::{Format, InputValue};
+use noirc_abi::MAIN_RETURN_NAME;
 use std::path::Path;
 
 use super::{create_named_dir, read_inputs_from_file, write_inputs_to_file, write_to_file};
@@ -58,11 +59,12 @@ pub fn parse_and_solve_witness<P: AsRef<Path>>(
 ) -> Result<BTreeMap<Witness, FieldElement>, CliError> {
     let abi = compiled_program.abi.as_ref().expect("compiled program is missing an abi object");
     // Parse the initial witness values from Prover.toml
-    let witness_map =
+    let mut witness_map =
         read_inputs_from_file(&program_dir, PROVER_INPUT_FILE, Format::Toml, abi.clone())?;
+    let return_value = witness_map.remove(MAIN_RETURN_NAME);
 
     // Solve the remaining witnesses
-    let solved_witness = solve_witness(compiled_program, &witness_map)?;
+    let solved_witness = solve_witness(compiled_program, &witness_map, return_value)?;
 
     // We allow the user to optionally not provide a value for the circuit's return value, so this may be missing from
     // `witness_map`. We must then decode these from the circuit's witness values.
@@ -86,14 +88,17 @@ pub fn parse_and_solve_witness<P: AsRef<Path>>(
 fn solve_witness(
     compiled_program: &noirc_driver::CompiledProgram,
     witness_map: &BTreeMap<String, InputValue>,
+    return_value: Option<InputValue>,
 ) -> Result<BTreeMap<Witness, FieldElement>, CliError> {
     let abi = compiled_program.abi.as_ref().unwrap();
-    let encoded_inputs = abi.clone().encode(witness_map, true).map_err(|error| match error {
-        AbiError::UndefinedInput(_) => {
-            CliError::Generic(format!("{error} in the {PROVER_INPUT_FILE}.toml file."))
-        }
-        _ => CliError::from(error),
-    })?;
+
+    let encoded_inputs =
+        abi.clone().encode(witness_map, return_value, true).map_err(|error| match error {
+            AbiError::UndefinedInput(_) => {
+                CliError::Generic(format!("{error} in the {PROVER_INPUT_FILE}.toml file."))
+            }
+            _ => CliError::from(error),
+        })?;
 
     let mut solved_witness: BTreeMap<Witness, FieldElement> = encoded_inputs
         .into_iter()

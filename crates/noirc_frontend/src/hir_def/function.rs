@@ -1,5 +1,5 @@
 use iter_extended::vecmap;
-use noirc_abi::{Abi, AbiParameter, AbiVisibility, MAIN_RETURN_NAME};
+use noirc_abi::{Abi, AbiParameter, AbiVisibility};
 use noirc_errors::{Location, Span};
 
 use super::expr::{HirBlockExpression, HirExpression, HirIdent};
@@ -63,7 +63,7 @@ impl Parameters {
             let as_abi = param.1.as_abi_type();
             AbiParameter { name: param_name, typ: as_abi, visibility: param.2 }
         });
-        noirc_abi::Abi { parameters }
+        noirc_abi::Abi { parameters, return_type: None }
     }
 
     pub fn span(&self) -> Span {
@@ -145,15 +145,8 @@ impl FuncMeta {
     pub fn into_abi(self, interner: &NodeInterner) -> Abi {
         let return_type = self.return_type().clone();
         let mut abi = self.parameters.into_abi(interner);
-
-        if return_type != Type::Unit {
-            let return_param = AbiParameter {
-                name: MAIN_RETURN_NAME.into(),
-                typ: return_type.as_abi_type(),
-                visibility: self.return_visibility,
-            };
-            abi.parameters.push(return_param);
-        }
+        abi.return_type =
+            if matches!(return_type, Type::Unit) { None } else { Some(return_type.as_abi_type()) };
 
         abi
     }
