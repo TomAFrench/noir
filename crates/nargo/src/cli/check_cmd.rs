@@ -1,4 +1,4 @@
-use crate::{errors::CliError, resolver::Resolver};
+use crate::{errors::CliError, resolver::CliResolver};
 use acvm::ProofSystemCompiler;
 use clap::Args;
 use iter_extended::btree_map;
@@ -29,7 +29,7 @@ pub(crate) fn run(args: CheckCommand, config: NargoConfig) -> Result<(), CliErro
 fn check_from_path<P: AsRef<Path>>(p: P, compile_options: &CompileOptions) -> Result<(), CliError> {
     let backend = crate::backends::ConcreteBackend;
 
-    let mut driver = Resolver::resolve_root_manifest(p.as_ref(), backend.np_language())?;
+    let mut driver = CliResolver::resolve_root_manifest(p.as_ref(), backend.np_language())?;
 
     driver.check_crate(compile_options).map_err(|_| CliError::CompilationError)?;
 

@@ -6,7 +6,7 @@ use noirc_driver::{CompileOptions, Driver};
 use noirc_frontend::node_interner::FuncId;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
-use crate::{errors::CliError, resolver::Resolver};
+use crate::{errors::CliError, resolver::CliResolver};
 
 use super::NargoConfig;
 
@@ -33,7 +33,7 @@ fn run_tests(
 ) -> Result<(), CliError> {
     let backend = crate::backends::ConcreteBackend;
 
-    let mut driver = Resolver::resolve_root_manifest(program_dir, backend.np_language())?;
+    let mut driver = CliResolver::resolve_root_manifest(program_dir, backend.np_language())?;
 
     driver.check_crate(compile_options).map_err(|_| CliError::CompilationError)?;
 

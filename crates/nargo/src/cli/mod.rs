@@ -108,6 +108,8 @@ mod tests {
 
     use std::path::{Path, PathBuf};
 
+    use crate::resolver::generic_resolver::add_std_lib;
+
     const TEST_DATA_DIR: &str = "tests/compile_tests_data";
 
     /// Compiles a file and returns true if compilation was successful
@@ -116,7 +118,7 @@ mod tests {
     fn file_compiles<P: AsRef<Path>>(root_file: P) -> bool {
         let mut driver = Driver::new(&acvm::Language::R1CS);
         driver.create_local_crate(&root_file, CrateType::Binary);
-        crate::resolver::add_std_lib(&mut driver);
+        add_std_lib(&mut driver);
         driver.file_compiles()
     }
 
